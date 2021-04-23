@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://www.youtube.com/iframe_api"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.2/css/bulma.min.css">
+    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.7.0/css/all.css" integrity="sha384-lZN37f5QGtY3VHgisS14W3ExzMWZxybE1SJSEsQp9S+oqd12jhcu+A56Ebc1zFSJ" crossorigin="anonymous">
+  </head>
+  <body>
+    <div class="m-3 columns box">
+      <div class="column m-3">
+        <h1 class="title is-1">WatchWith.me</h1>
+      </div>
+      <div class="column m-3">
+        <h1 class="title is-1">Room ID: {{roomId}}</h1>
+      </div>
+    </div>
+    <div class="box" style="text-align:center">
+      <div id="title"></div>
+      <div class="columns">
+        <div class="column is-3">
+          <div class="m-3 box">
+            <h3 class="title is-3">Connected Users</h3>
+            <div id="users"></div>
+          </div>
+        </div>
+        <div class="column is-6">
+          <div class="m-3 box" style="text-align:center">
+            <div id="player"></div>
+            <div id="extraData"></div>
+          </div>
+        </div>
+        <div class="column is-3">
+                    <div class="m-3 box">
+            <h3 class="title is-3">Manage Room</h3>
+            <div class="field has-addons">
+              <span>Load Video</span>
+              <div class="control">
+                <input class="input" type="text" id="changeUrl" placeholder="Video ID">
+              </div>
+              <div class="control">
+                <input class="button is-primary" onclick="change()" type="submit" id="changeButton" value="Change">
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script>
+
+
+      const roomId = '{{roomId}}'
+
+      const socket = io.connect('/rooms');
+      var player;
+
+      socket.emit('auth', {message: {
+        room: roomId,
+        name: prompt('What is your username?', 'Name')
+      }})
+
+      function onPlayerReady(event) {
+        event.target.playVideo();
+        function loadVideo(id) {
+          event.target.loadVideoById(id)
+        }
+      }
+
+      socket.on('update', function(evt) {
+        fetch(`/api/video/${evt.message.video.url}`)
+        .then(response => response.json())
+        .then(data => {
+          document.getElementById('title').innerHTML = `<h3 class="title is-3">${data.title}</h3>`
+          document.getElementById('extraData').innerHTML = `
+          ${data.views} <span class="icon"><i class="fas fa-eye"></i></span><br>
+          ${data.uploaded} <span class="icon"><i class="fas fa-upload"></i></span><br>
+          ${data.author} <span class="icon"><i class="fas fa-user"></i></span><br>
+          `
+        });
+        if (player) {
+          player.loadVideoById(evt.message.video.url)
+        } else {
+          player = new YT.Player('player', {
+            videoId: evt.message.video.url,
+            events: {
+              'onReady': onPlayerReady
+            }
+          })
+        }
+      })
+
+      socket.on('join', function(evt) {
+        document.getElementById('users').innerHTML = '';
+        console.log(evt.message.users)
+        for (x in evt.message.users) {
+          if (evt.message.users[x].valid === 'yes') {
+            let span = document.createElement('span')
+            span.innerHTML = evt.message.users[x].name 
+            document.getElementById('users').appendChild(span)
+            document.getElementById('users').appendChild(document.createElement('br'))
+          }
+        }
+      })
+
+      function change() {
+        socket.emit('change', {message: {
+          url: document.getElementById('changeUrl').value,
+          room: roomId
+        }})
+      }
+
+
+    </script>
+  </body>
+</html>
